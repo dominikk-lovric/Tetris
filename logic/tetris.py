@@ -1,3 +1,4 @@
+import copy
 import random
 from enum import IntEnum
 
@@ -19,8 +20,10 @@ class TetrisGame:
         self.w=width if width else (size[0] if size else 10)
         self.rng=random.Random(seed)
         self.reset()
+        self.seed=seed
 
     def reset(self):
+        self.rng=random.Random(self.seed)
         self.rows=self.h+self.HIDDEN
         self.board=[[0]*self.w for i in range(self.rows)]
         self.hold=None
@@ -31,6 +34,15 @@ class TetrisGame:
         self.game_over=False
         self.next_piece=self.get_piece()
         self.spawn()
+
+    def clone(self):
+        c = copy.copy(self)
+        c.board = [r[:] for r in self.board]
+        c.bag = self.bag[:]
+        c.cells = list(self.cells)
+        c.rng = random.Random()
+        c.rng.setstate(self.rng.getstate())
+        return c
 
     def get_piece(self):
         if len(self.bag)<=3:

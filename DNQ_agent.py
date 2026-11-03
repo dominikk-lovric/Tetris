@@ -38,59 +38,44 @@ class DQN(nn.Module):
         return self.network(state)
 
 class ReplayBuffer:
-    def __init__(self, capacity, state_size):
+    def __init__(self, capacity, state_size, device):
+        self.device = device
         self.capacity = capacity
-
-        self.states = np.zeros(
-            (capacity, state_size), dtype=np.float32
-        )
-
-        self.next_states = np.zeros(
-            (capacity, state_size), dtype=np.float32
-        )
-
-        self.actions = np.zeros(capacity, dtype=np.int64)
-        self.rewards = np.zeros(capacity, dtype=np.float32)
-        self.dones = np.zeros(capacity, dtype=np.float32)
-
+        self.states = torch.zeros((capacity, state_size), device=device)
+        self.next_states = torch.zeros((capacity, state_size), device=device)
+        self.actions = torch.zeros(capacity, dtype=torch.int64, device=device)
+        self.rewards = torch.zeros(capacity, device=device)
+        self.dones = torch.zeros(capacity, device=device)
         self.position = 0
         self.size = 0
 
-    def add(self, state, action, reward, next_state, done):
+    def add(self, s, a, r, ns, d):
         i = self.position
-
-        self.states[i] = state
-        self.actions[i] = action
-        self.rewards[i] = reward
-        self.next_states[i] = next_state
-        self.dones[i] = done
-
-        self.position = (self.position + 1) % self.capacity
+        self.states[i] = torch.as_tensor(s, device=self.device)
+        self.next_states[i] = torch.as_tensor(ns, device=self.device)
+        self.actions[i] = a
+        self.rewards[i] = r
+        self.dones[i] = float(d)
+        self.position = (i + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
 
     def sample(self, batch_size):
-        indices = np.random.randint(0, self.size, size=batch_size)
-
-        return (
-            self.states[indices],
-            self.actions[indices],
-            self.rewards[indices],
-            self.next_states[indices],
-            self.dones[indices]
-        )
+        idx = torch.randint(0, self.size, (batch_size,), device=self.device)
+        return (self.states[idx], self.actions[idx], self.rewards[idx],
+                self.next_states[idx], self.dones[idx])
 
     def __len__(self):
         return self.size
 
 
 
-epsilon_start = 1.0
 epsilon_end = 0.05
-epsilon_decay = 3000
+epsilon_decay = 50_000
 
 class Agent:
     def __init__(self, input_size, n_actions, learning_rate=0.001, gamma=0.99,
-                 batch_size=64, buffer_size=50000):
+                 batch_size=64, buffer_size=50000, epsilon_start=1.0):
+        self.epsilon_start = epsilon_start
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.n_actions = n_actions
 
@@ -110,7 +95,8 @@ class Agent:
 
         self.memory = ReplayBuffer(
             capacity=buffer_size,
-            state_size=input_size
+            state_size=input_size,
+            device=self.device
         )
 
         self.gamma=gamma
@@ -141,11 +127,6 @@ class Agent:
             self.memory.sample(self.batch_size)
         )
 
-        states = torch.tensor(states, dtype=torch.float32, device=self.device)
-        actions = torch.tensor(actions, dtype=torch.long, device=self.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
-        next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
-        dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
 
         current_q = self.model(states).gather(
             1, actions.unsqueeze(1)
@@ -164,10 +145,10 @@ class Agent:
 
         loss = self.loss_function(current_q, target_q)
 
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
+        #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
 
         self.optimizer.step()
 
@@ -176,9 +157,9 @@ class Agent:
         if self.steps % self.target_update == 0:
             self.target_model.load_state_dict(self.model.state_dict())
 
-        return loss.item()
+        return loss.detach()
 
     def get_epsilon(self):
         return epsilon_end + (
-                epsilon_start - epsilon_end
+                self.epsilon_start - epsilon_end
         ) * np.exp(-self.environment_steps / epsilon_decay)

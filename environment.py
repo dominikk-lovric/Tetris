@@ -3,14 +3,14 @@ import numpy as np
 from colorama import Fore
 
 WEIGHTS = dict(
-    game_over=-10.0,
-    piece=0.05,
-    height=-0.05,
-    holes=-0.5,
-    bump=-0.0,
+    game_over=-40.0,
+    piece=0.3,
+    height=-0.1,
+    holes=-1,
+    bump=-0.2,
     missed=-1.0,
 )
-LINE_REWARD = {0: 0.0, 1: 50.0, 2: 100.0, 3: 200.0, 4: 300.0}
+LINE_REWARD = {0: 0.0, 1: 5.0, 2: 15.0, 3: 30.0, 4: 50.0}
 
 PIECES = ["I", "O", "T", "S", "Z", "J", "L"]
 HOLD_PIECES = [None] + PIECES
@@ -152,3 +152,4 @@ class PlaceChoiceEnv:
                 print(colors[item] + str(item), end="")
             print()
         print(Fore.WHITE)
+
