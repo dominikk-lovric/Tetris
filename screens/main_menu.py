@@ -1,5 +1,5 @@
 from elements.text import Text
-from screens import menu_screen
+from screens import menu_screen, training_screen
 import pyfiglet
 
 from screens.game_settings_menu import GameSettingsMenu
@@ -23,6 +23,7 @@ class MainMenu(menu_screen.MenuScreen):
     def options(self):
         return [
             (Text("Play"), lambda: self.Game.push_screen(GameSettingsMenu(self.Game))),
+            (Text("Train"), lambda: self.Game.push_screen(training_screen.TrainingScreen(self.Game))),
             (Text("Settings"), lambda: self.Game.push_screen(SettingsScreen(self.Game))),
             (Text("Exit"), lambda: self.Game.pop_screen()),
         ]

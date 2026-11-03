@@ -13,6 +13,9 @@ DEFAULT={
             "ROTATE_L": [
                 "left"
             ],
+            "ROTATE_180":[
+                "up"
+            ],
             "HARD_DROP": [
                 "space"
             ],

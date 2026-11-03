@@ -7,6 +7,9 @@
             "ROTATE_L": [
                 "left"
             ],
+            "ROTATE_180": [
+                "up"
+            ],
             "HARD_DROP": [
                 "space"
             ],
@@ -832,8 +835,8 @@
         }
     },
     "HIGHSCORE": {
-        "SMALL": 2620,
-        "NORMAL": 0,
+        "SMALL": 0,
+        "NORMAL": 5562,
         "LARGE": 0
     },
     "UNIT": 16

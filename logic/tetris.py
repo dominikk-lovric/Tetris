@@ -3,11 +3,6 @@ from enum import IntEnum
 
 from settings import Settings
 
-
-class Action(IntEnum):
-    NOOP = 0; LEFT = 1; RIGHT = 2; ROTATE_R = 3; ROTATE_L = 4; SOFT_DROP = 5; HARD_DROP = 6; HOLD=7
-
-
 LINE_SCORES   = (0, 100, 300, 500, 800)
 PERFECT_CLEAR = (0, 800, 1200, 1800, 2000)
 PERFECT_CLEAR_B2B_TETRIS = 3200
@@ -75,12 +70,13 @@ class TetrisGame:
         return self.collides(self.cells, self.x, self.y + 1)
 
     def rotate(self, direction):
+        newRotation=self.Game.settings.get("ROTATIONS")[(self.Game.settings.get("ROTATIONS").index(self.rotation)+direction)%len(self.Game.settings.get("ROTATIONS"))]
         if direction==1:
-            newRotation=self.Game.settings.get("ROTATIONS")[(self.Game.settings.get("ROTATIONS").index(self.rotation)+1)%len(self.Game.settings.get("ROTATIONS"))]
             rotated=[(-cy,cx) for cx,cy in self.cells]
         elif direction==-1:
-            newRotation=self.Game.settings.get("ROTATIONS")[(self.Game.settings.get("ROTATIONS").index(self.rotation)-1)%len(self.Game.settings.get("ROTATIONS"))]
             rotated = [(cy, -cx) for cx, cy in self.cells]
+        elif direction ==2:
+            rotated= [(-cx,-cy) for cx,cy in self.cells]
         else:
             newRotation=self.rotation
             rotated=self.cells
@@ -167,11 +163,12 @@ class TetrisGame:
 
     def gravity(self):
         if self.game_over:
-            return 0
+            return True
         if not self.grounded():
             self.y += 1
             self.after_fall()
-        return 0
+            return False
+        return True
 
     def soft_drop(self):
         if not self.grounded():
@@ -190,6 +187,8 @@ class TetrisGame:
             self.rotate(1)
         elif action=="ROTATE_L":
             self.rotate(-1)
+        elif action=="ROTATE_180":
+            self.rotate(2)
         elif action=="SOFT_DROP":
             self.soft_drop()
         elif action=="HOLD":
@@ -198,8 +197,9 @@ class TetrisGame:
             while  not self.collides(self.cells, self.x, self.y+1):
                 self.y+=1
                 self.score += 2
-            return self.lock_piece()
-        return 0
+            self.lock_piece()
+            return True
+        return False
 
     def get_game_info(self):
         return{

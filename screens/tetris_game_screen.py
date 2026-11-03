@@ -9,18 +9,6 @@ from screen import Screen
 from screens.game_over_screen import GameOverScreen
 from screens.pause_screen import PauseScreen
 
-
-KEYMAP = {
-    pygame.K_UP: Action.ROTATE_R,
-    pygame.K_SPACE: Action.HARD_DROP, pygame.K_LSHIFT: Action.HOLD,
-}
-
-REPEAT = {
-    pygame.K_LEFT:  (Action.LEFT,      0.17, 0.05),
-    pygame.K_RIGHT: (Action.RIGHT,     0.17, 0.05),
-    pygame.K_DOWN:  (Action.SOFT_DROP, 0.0,  0.04),
-}
-
 class TetrisGameScreen(Screen):
     GRAVITY_INTERVAL=0.5
     def __init__(self, game, width=None, height=None, size=None):

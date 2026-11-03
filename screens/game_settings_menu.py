@@ -32,12 +32,5 @@ class GameSettingsMenu(menu_screen.MenuScreen):
             (self.size_selector, lambda: ()),
             (self.player_selector, lambda: ()),
             (Text("Play", size=self.Game.settings.get("UNIT")), lambda: self.Game.push_screen(TetrisGameScreen(self.Game, width=self.size_selector.get_selected()[0], height=self.size_selector.get_selected()[1]))),
-            (
-                Row(
-                    [Text("Back", size=self.Game.settings.get("UNIT")), Image("assets/back.png", size=24)],
-                    align="center",
-                    spacing=24
-                ),
-                self.Game.pop_screen
-            ),
+            (Text("Back", size=self.Game.settings.get("UNIT")), self.Game.pop_screen),
         ]

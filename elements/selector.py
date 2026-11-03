@@ -6,13 +6,14 @@ from elements.text import Text
 
 
 class Selector(Element):
-    def __init__(self, options, value=None, title="",color=None, size=None, selected=0):
+    def __init__(self, options, value=None, title="",color=None, size=None, selected=0, func=None):
         self.title = title
         self.options = options
         self.color = color
         self.size = size or 24
         self.selected = selected
         self.value = value
+        self.func= func or (lambda *args: None)
 
 
 
@@ -57,9 +58,11 @@ class Selector(Element):
     def handle_event(self, event):
         if event.key in (pygame.K_d, pygame.K_RIGHT):
             self.selected = (self.selected+1)%len(self.options)
+            self.func(self.value[self.selected] if self.value else self.options[self.selected])
 
         elif event.key in (pygame.K_a, pygame.K_LEFT):
             self.selected= (self.selected-1)%len(self.options)
+            self.func(self.value[self.selected] if self.value else self.options[self.selected])
 
 
     def draw(self, screen, pos):
