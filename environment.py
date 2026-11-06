@@ -2,16 +2,9 @@ from logic.tetris import *
 import numpy as np
 from colorama import Fore
 
-WEIGHTS = dict(
-    game_over=-40.0,
-    piece=0.3,
-    height=-0.1,
-    holes=-1,
-    bump=-0.2,
-    missed=-1.0,
-)
+WEIGHTS = dict(game_over=-10.0, piece=1.0, height=0.0, holes=-1.0, bump=-0.1, missed=-1.0, max_height=0.0)
 LINE_REWARD = {0: 0.0, 1: 5.0, 2: 15.0, 3: 30.0, 4: 50.0}
-
+N_PREVIEW = 3
 PIECES = ["I", "O", "T", "S", "Z", "J", "L"]
 HOLD_PIECES = [None] + PIECES
 HIDDEN_ROWS = 4
@@ -34,14 +27,16 @@ def column_heights(board):
 def encode_state(tetris):
     b = np.asarray(tetris.board)[HIDDEN_ROWS:] > 0
     rows = b.shape[0]
-
     heights = column_heights(tetris.board).astype(np.float32) / rows
+
+    queue = tetris.get_next()[:3]
+    queue_enc = [one_hot(p, PIECES) for p in queue]
 
     return np.concatenate([
         b.astype(np.float32).flatten(),
         heights,
         one_hot(tetris.current_piece, PIECES),
-        one_hot(tetris.next_piece, PIECES),
+        *queue_enc,
         one_hot(tetris.hold, HOLD_PIECES),
     ])
 
@@ -57,7 +52,80 @@ class PlaceChoiceEnv:
 
     @property
     def n_actions(self):
-        return 4 * self.tetris.w
+        return 2 * 4 * self.tetris.w
+
+    def execute(self, t, action):
+        w = t.w
+        use_hold, rest = divmod(int(action), 4 * w)
+        rotation, target_x = divmod(rest, w)
+
+        if use_hold:
+            if not t.can_hold:
+                return False
+            t.act("HOLD")
+            if t.game_over:
+                return False
+
+        for key in ROT_KEYS[rotation]:
+            t.act(key)
+        rots =["0","R","2","L"]
+        ok = rots.index(t.rotation) == rotation
+
+        for _ in range(w):
+            x = t.x
+            if x == target_x:
+                break
+            t.act("LEFT" if x > target_x else "RIGHT")
+            if t.x == x:
+                break
+        ok = ok and t.x == target_x
+
+        t.act("HARD_DROP")
+        return ok
+
+    def legal_actions(self):
+        t0 = self.tetris
+        w = t0.w
+        mask = np.zeros(self.n_actions, dtype=bool)
+        rots = t0.Game.settings.get("ROTATIONS")
+        seen = set()
+
+        for use_hold in (0, 1):
+            if use_hold and not t0.can_hold:
+                continue
+            base = t0.clone()
+            if use_hold:
+                base.act("HOLD")
+                if base.game_over:
+                    continue
+
+            for rot in range(4):
+                sim = base.clone()
+                for key in ROT_KEYS[rot]:
+                    sim.act(key)
+                if rots.index(sim.rotation) != rot:  # rotation failed
+                    continue
+
+                lo = sim.x
+                while not sim.collides(sim.cells, lo - 1, sim.y):
+                    lo -= 1
+                hi = sim.x
+                while not sim.collides(sim.cells, hi + 1, sim.y):
+                    hi += 1
+
+                for x in range(max(lo, 0), min(hi, w - 1) + 1):
+                    y = sim.y
+                    while not sim.collides(sim.cells, x, y + 1):
+                        y += 1
+                    key = (use_hold, frozenset((x + cx, y + cy) for cx, cy in sim.cells))
+                    if key in seen:  # same landing, e.g. O-piece rotations
+                        continue
+                    seen.add(key)
+                    mask[use_hold * 4 * w + rot * w + x] = True
+
+        if not mask.any():
+            mask[:] = True
+        return mask
 
     def reset(self):
         self.tetris.reset()
@@ -78,44 +146,22 @@ class PlaceChoiceEnv:
 
     def act(self, action):
         t = self.tetris
-        rotation, target_x = divmod(int(action), t.w)
-
-        prev_features = self.board_features(t.board)
-
-        for key in ROT_KEYS[rotation]:
-            t.act(key)
-
-        for _ in range(t.w):
-            x = t.x
-            if x == target_x:
-                break
-            t.act("LEFT" if x > target_x else "RIGHT")
-            if t.x == x:
-                break
-
-        missed = t.x != target_x
-
-        locked = t.act("HARD_DROP")
-        while not locked and not t.game_over:
-            locked = t.gravity()
+        prev = self.board_features(t.board)
+        ok = self.execute(t, action)
+        if not ok:
+            self.missed += 1
 
         self.steps += 1
         cleared = t.lines - self.lines
+        self.lines = t.lines
 
-        reward = self.shaped_reward(prev_features, self.board_features(t.board), cleared)
+        reward = self.shaped_reward(prev, self.board_features(t.board), cleared)
         reward += WEIGHTS["piece"]
-
-        if missed:
-            reward += WEIGHTS["missed"]
-            self.missed += 1
-
         done = t.game_over
         if done:
             reward += WEIGHTS["game_over"]
             if self.verbose:
                 self.print_board()
-
-        self.lines = t.lines
         return encode_state(t), reward, done
 
     def board_features(self, board):
@@ -136,10 +182,13 @@ class PlaceChoiceEnv:
         return int(heights.sum()), holes, bumpiness, int(heights.max())
 
     def shaped_reward(self, prev, curr, cleared):
+        rows = self.tetris.h
+        over = lambda m: max(0, m - rows // 2)
         r = LINE_REWARD.get(cleared, 0.0)
         r += WEIGHTS["height"] * (curr[0] - prev[0])
         r += WEIGHTS["holes"] * (curr[1] - prev[1])
         r += WEIGHTS["bump"] * (curr[2] - prev[2])
+        r += WEIGHTS["max_height"] * (over(curr[3]) - over(prev[3]))
         return r
 
     def print_board(self):

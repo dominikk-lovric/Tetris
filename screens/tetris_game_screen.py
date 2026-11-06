@@ -100,9 +100,8 @@ class TetrisGameScreen(Screen):
         held.draw(surface, ((posX-held.get_size()[0])/2,72))
 
         bag=[]
-        for piece in self.tetris.get_next()[-3:]:
+        for piece in self.tetris.get_next()[:3]:
             bag.append(self.get_centered(self.get_piece(piece), 6*self.Game.settings.get("UNIT"), 6*self.Game.settings.get("UNIT")))
-        bag=bag[::-1]
         upcoming=Column([Text("Upcoming:",size = self.Game.settings.get("UNIT")),self.get_centered(Column(bag),6*24,20*24, self.Game.settings.get_touple("COLORS/HIGHLIGHT"), 2)], spacing=self.Game.settings.get("UNIT")/2)
         upcoming.draw(surface, ((posX+tetrisTable.get_size()[0]+surface.get_rect().width-upcoming.get_size()[0])/2,self.Game.settings.get("UNIT")*3))
 

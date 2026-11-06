@@ -16,11 +16,10 @@ class TetrisGame:
 
     def __init__(self, game, size=None, height=None, width=None, seed=None):
         self.Game=game
-        self.h=height if height else (size[1] if size else 10)
+        self.h=height if height else (size[1] if size else 20)
         self.w=width if width else (size[0] if size else 10)
-        self.rng=random.Random(seed)
-        self.reset()
         self.seed=seed
+        self.reset()
 
     def reset(self):
         self.rng=random.Random(self.seed)
@@ -242,7 +241,7 @@ class TetrisGame:
         return self.bag
 
     def get_next(self):
-        return [*self.bag,self.next_piece]
+        return [self.next_piece] + self.bag[::-1]
 
     def get_level(self):
         return self.lines//10+1
