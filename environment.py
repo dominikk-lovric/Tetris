@@ -10,6 +10,18 @@ HOLD_PIECES = [None] + PIECES
 HIDDEN_ROWS = 4
 ROT_KEYS = [[], ["ROTATE_R"], ["ROTATE_180"], ["ROTATE_L"]]
 
+def print_board(board):
+    colors = {
+        0: Fore.BLACK, 1: Fore.CYAN, 2: Fore.YELLOW, 3: Fore.MAGENTA,
+        4: Fore.GREEN, 5: Fore.RED, 6: Fore.BLUE, 7: Fore.WHITE,
+    }
+    for line in board:
+        for item in line:
+            print(colors[item] + str(item), end="")
+        print()
+    print(Fore.WHITE)
+
+
 
 def one_hot(value, options):
     result = np.zeros(len(options), dtype=np.float32)
@@ -40,6 +52,42 @@ def encode_state(tetris):
         one_hot(tetris.hold, HOLD_PIECES),
     ])
 
+def board_features(board):
+    b = np.asarray(board)[HIDDEN_ROWS:] > 0
+    h, w = b.shape
+
+    heights = column_heights(board)
+
+    holes = 0
+    for c in range(w):
+        col = b[:, c]
+        if col.any():
+            top = col.argmax()
+            holes += int((~col[top:]).sum())
+
+    bumpiness = int(np.abs(np.diff(heights)).sum())
+
+    return int(heights.sum()), holes, bumpiness, int(heights.max())
+
+def shaped_reward(tetris, prev, curr, cleared):
+    rows = tetris.h
+    over = lambda m: max(0, m - rows // 2)
+    r = LINE_REWARD.get(cleared, 0.0)
+    r += WEIGHTS["height"] * (curr[0] - prev[0])
+    r += WEIGHTS["holes"] * (curr[1] - prev[1])
+    r += WEIGHTS["bump"] * (curr[2] - prev[2])
+    r += WEIGHTS["max_height"] * (over(curr[3]) - over(prev[3]))
+    return r
+
+def get_state(tetris):
+    return (
+        tetris.board,
+        tetris.current_piece,
+        tetris.x,
+        tetris.y,
+        tetris.rotation,
+        tetris.hold
+    )
 
 class PlaceChoiceEnv:
     def __init__(self, game, size=None, height=None, width=None, seed=None, verbose=False):
@@ -87,7 +135,7 @@ class PlaceChoiceEnv:
         t0 = self.tetris
         w = t0.w
         mask = np.zeros(self.n_actions, dtype=bool)
-        rots = t0.Game.settings.get("ROTATIONS")
+        rots = ROT_KEYS
         seen = set()
 
         for use_hold in (0, 1):
@@ -134,19 +182,9 @@ class PlaceChoiceEnv:
         self.missed = 0
         return encode_state(self.tetris)
 
-    def get_state(self):
-        return (
-            self.tetris.board,
-            self.tetris.current_piece,
-            self.tetris.x,
-            self.tetris.y,
-            self.tetris.rotation,
-            self.tetris.hold
-        )
-
     def act(self, action):
         t = self.tetris
-        prev = self.board_features(t.board)
+        prev = board_features(t.board)
         ok = self.execute(t, action)
         if not ok:
             self.missed += 1
@@ -155,50 +193,29 @@ class PlaceChoiceEnv:
         cleared = t.lines - self.lines
         self.lines = t.lines
 
-        reward = self.shaped_reward(prev, self.board_features(t.board), cleared)
+        reward = shaped_reward(self.tetris, prev, board_features(t.board), cleared)
         reward += WEIGHTS["piece"]
         done = t.game_over
         if done:
             reward += WEIGHTS["game_over"]
             if self.verbose:
-                self.print_board()
+                print_board(self.tetris.board)
         return encode_state(t), reward, done
 
-    def board_features(self, board):
-        b = np.asarray(board)[HIDDEN_ROWS:] > 0
-        h, w = b.shape
 
-        heights = column_heights(board)
 
-        holes = 0
-        for c in range(w):
-            col = b[:, c]
-            if col.any():
-                top = col.argmax()
-                holes += int((~col[top:]).sum())
+class EveryChoiceEnv:
+    def __init__(self, game, size=None, height=None, width=None, seed=None, verbose=False):
+        self.tetris = TetrisGame(game, size=size, height=height, width=width, seed=seed)
+        self.tetris.reset()
+        self.lines = self.tetris.lines
+        self.steps = 0
+        self.verbose = verbose
+        self.actions=["LEFT", "RIGHT", "SOFT DROP", "HARD DROP", "ROTATE_R", "ROTATE_L", "ROTATE_180", "HARD_DROP", "HOLD", "NONE"]
 
-        bumpiness = int(np.abs(np.diff(heights)).sum())
+    @property
+    def n_actions(self):
+        return len(self.actions)
 
-        return int(heights.sum()), holes, bumpiness, int(heights.max())
-
-    def shaped_reward(self, prev, curr, cleared):
-        rows = self.tetris.h
-        over = lambda m: max(0, m - rows // 2)
-        r = LINE_REWARD.get(cleared, 0.0)
-        r += WEIGHTS["height"] * (curr[0] - prev[0])
-        r += WEIGHTS["holes"] * (curr[1] - prev[1])
-        r += WEIGHTS["bump"] * (curr[2] - prev[2])
-        r += WEIGHTS["max_height"] * (over(curr[3]) - over(prev[3]))
-        return r
-
-    def print_board(self):
-        colors = {
-            0: Fore.BLACK, 1: Fore.CYAN, 2: Fore.YELLOW, 3: Fore.MAGENTA,
-            4: Fore.GREEN, 5: Fore.RED, 6: Fore.BLUE, 7: Fore.WHITE,
-        }
-        for line in self.tetris.board:
-            for item in line:
-                print(colors[item] + str(item), end="")
-            print()
-        print(Fore.WHITE)
-
+    def act(self, action):
+        pass

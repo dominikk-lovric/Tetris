@@ -33,6 +33,9 @@ class DQN(nn.Module):
             nn.Linear(256, 256),
             nn.ReLU(),
 
+            nn.Linear(256, 256),
+            nn.ReLU(),
+
             nn.Linear(256, output_size)
         )
 

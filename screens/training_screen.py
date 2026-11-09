@@ -20,9 +20,9 @@ times = {
     "training": 0
 }
 
-MODEL_DIR = "models/reinforcement/dnq/place"
-CKPT = os.path.join(MODEL_DIR, "tetris_model.pth")
-BEST = os.path.join(MODEL_DIR, "tetris_best.pth")
+DIR = "reinforcement"
+CKPT = os.path.join(f'models/{DIR}', "tetris_model.pth")
+BEST = os.path.join(f'models/{DIR}', "tetris_best.pth")
 
 class TrainingScreen(menu_screen.MenuScreen):
     title = "TRAINING"
@@ -55,7 +55,7 @@ class TrainingScreen(menu_screen.MenuScreen):
         self.get_graphs()
 
     def get_graphs(self, num=None):
-        dir = f'graphs/{num}' if num is not None else "graphs"
+        dir = f'graphs/{DIR}/{num}' if num is not None else "graphs"
         os.makedirs(dir, exist_ok=True)
 
         with self.data_lock:
@@ -128,7 +128,7 @@ class TrainingScreen(menu_screen.MenuScreen):
 
     def trainPlaceChoice(self):
         try:
-            os.makedirs(MODEL_DIR, exist_ok=True)
+            os.makedirs(f'models/{DIR}', exist_ok=True)
             env = PlaceChoiceEnv(self.Game)
             state = env.reset()
 
